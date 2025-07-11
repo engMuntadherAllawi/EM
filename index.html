@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>نظام إدارة البيانات</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      direction: rtl;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+    }
+    header {
+      background-color: #0d47a1;
+      color: white;
+      padding: 25px 0;
+      text-align: center;
+      font-size: 30px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      background-color: #1976d2;
+      padding: 15px;
+      gap: 10px;
+    }
+    nav button {
+      background-color: #ffffff;
+      color: #0d47a1;
+      border: 2px solid #0d47a1;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    nav button:hover {
+      background-color: #0d47a1;
+      color: white;
+    }
+    section {
+      display: none;
+      padding: 40px;
+      animation: fadeIn 0.4s ease-in-out;
+    }
+    section.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .form-container, .search-container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      max-width: 1000px;
+      margin: auto;
+    }
+    .form-title {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #0d47a1;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-group label {
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group input,
+    .form-group select {
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    form button, .search-container button {
+      display: block;
+      margin: 30px auto 0;
+      background-color: #0d47a1;
+      color: white;
+      padding: 12px 35px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    form button:hover, .search-container button:hover {
+      background-color: #002171;
+    }
+    #uploadExcel {
+      display: block;
+      margin: 20px auto;
+      padding: 10px;
+      font-size: 16px;
+    }
+    .search-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .search-grid select,
+    .search-grid input {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 250px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #0d47a1;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <header>نظام إدارة البيانات من ملف Excel</header>
+  <input type="file" id="uploadExcel" accept=".xlsx, .xls">
+  <nav>
+    <button onclick="showPage('searchPage')">صفحة البحث</button>
+    <button onclick="showPage('addPage')">إضافة بيانات</button>
+    <button onclick="showPage('editPage')">تعديل / حذف</button>
+    <button onclick="showPage('savePage')">حفظ البيانات</button>
+  </nav>
+
+  <section id="searchPage">
+    <div class="search-container">
+      <h2 class="form-title">البحث في البيانات</h2>
+      <div class="search-grid">
+        <select id="searchColumn" onchange="searchTable()"></select>
+        <input type="text" id="search" placeholder="أدخل الكلمة المراد البحث عنها..." oninput="searchTable()">
+      </div>
+      <table id="searchTable">
+        <thead><tr id="searchHeader"></tr></thead>
+        <tbody id="searchBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="addPage">
+    <div class="form-container">
+      <h2 class="form-title">إضافة بيانات جديدة</h2>
+      <form onsubmit="addRow(); return false;">
+        <div id="addInputs" class="form-grid"></div>
+        <button type="submit">إضافة</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="editPage">
+    <h2>تعديل أو حذف البيانات</h2>
+    <table id="editTable">
+      <thead><tr id="editHeader"></tr></thead>
+      <tbody id="editBody"></tbody>
+    </table>
+  </section>
+
+  <section id="savePage">
+    <h2>حفظ البيانات</h2>
+    <button onclick="saveToExcel()">تحميل البيانات إلى ملف Excel</button>
+  </section>
+
+  <script>
+    let data = [];
+    let headers = [];
+
+    document.getElementById('uploadExcel').addEventListener('change', handleFile, false);
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const workbook = XLSX.read(e.target.result, { type: 'binary' });
+        const firstSheet = workbook.SheetNames[0];
+        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+        data = sheetData;
+        headers = Object.keys(data[0] || {});
+        buildAddForm();
+        buildAllTables();
+        buildSearchColumn();
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    function showPage(id) {
+      document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function buildTable(headerId, bodyId, isEditable = false, allowDelete = false, withActions = false) {
+  const headerRow = document.getElementById(headerId);
+  headerRow.innerHTML = '';
+  headers.forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headerRow.appendChild(th);
+  });
+  if (allowDelete || withActions) {
+    const th = document.createElement('th');
+    th.textContent = 'الإجراء';
+    headerRow.appendChild(th);
+  }
+
+  const body = document.getElementById(bodyId);
+  body.innerHTML = '';
+  data.forEach((row, index) => {
+    const tr = document.createElement('tr');
+    headers.forEach(h => {
+      const td = document.createElement('td');
+      if (isEditable) {
+        const input = document.createElement('input');
+        input.value = row[h] || '';
+        input.oninput = e => row[h] = e.target.value;
+        td.appendChild(input);
+      } else {
+        td.textContent = row[h] || '';
+      }
+      tr.appendChild(td);
+    });
+
+    if (allowDelete || withActions) {
+      const td = document.createElement('td');
+
+      if (withActions) {
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'تعديل';
+        editBtn.onclick = () => {
+          showPage('editPage');
+          const editInputs = document.querySelectorAll('#editBody tr')[index].querySelectorAll('input');
+          editInputs.forEach((input, i) => {
+            input.focus();
+          });
+        };
+        td.appendChild(editBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'حذف';
+        deleteBtn.style.marginRight = '10px';
+        deleteBtn.onclick = () => {
+          if (confirm('هل أنت متأكد من حذف هذا السطر؟')) {
+            data.splice(index, 1);
+            buildAllTables();
+          }
+        };
+        td.appendChild(deleteBtn);
+      }
+
+      if (allowDelete && !withActions) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'حذف';
+        deleteBtn.onclick = () => {
+          data.splice(index, 1);
+          buildAllTables();
+        };
+        td.appendChild(deleteBtn);
+      }
+
+      tr.appendChild(td);
+    }
+
+    body.appendChild(tr);
+  });
+}
+
+    function searchTable() {
+      const value = document.getElementById('search').value.toLowerCase();
+      const selectedHeader = document.getElementById('searchColumn').value;
+      const rows = document.getElementById('searchBody').getElementsByTagName('tr');
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        let match = false;
+        for (let j = 0; j < headers.length; j++) {
+          if (headers[j] === selectedHeader && cells[j] && cells[j].textContent.toLowerCase().includes(value)) {
+            match = true;
+            break;
+          }
+        }
+        rows[i].style.display = match ? '' : 'none';
+      }
+    }
+
+    function buildSearchColumn() {
+      const select = document.getElementById('searchColumn');
+      select.innerHTML = '';
+      headers.forEach(h => {
+        const option = document.createElement('option');
+        option.value = h;
+        option.textContent = h;
+        select.appendChild(option);
+      });
+    }
+
+    function addRow() {
+      const newRow = {};
+      headers.forEach(h => {
+        const value = document.getElementById('add_' + h).value;
+        newRow[h] = value;
+      });
+      if (!newRow['رقم الحساب'] || !newRow['رقم المقياس'] || !newRow['الاسم'] || !newRow['العنوان']) {
+        alert('يرجى ملء الحقول الأساسية');
+        return;
+      }
+      const duplicate = data.some(row => row['رقم الحساب'] == newRow['رقم الحساب'] || row['رقم المقياس'] == newRow['رقم المقياس']);
+      if (duplicate) {
+        alert('رقم الحساب أو رقم المقياس مكرر!');
+        return;
+      }
+      data.push(newRow);
+      buildAllTables();
+      alert('تمت الإضافة بنجاح');
+    }
+
+    function saveToExcel() {
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'البيانات');
+      XLSX.writeFile(wb, 'البيانات_المعدلة.xlsx');
+    }
+
+    function buildAddForm() {
+      const container = document.getElementById('addInputs');
+      container.innerHTML = '';
+      headers.forEach(h => {
+        const input = document.createElement('input');
+        input.id = 'add_' + h;
+        input.placeholder = h;
+        container.appendChild(input);
+      });
+    }
+
+    function buildAllTables() {
+  buildTable('searchHeader', 'searchBody', false, false, true); // search table with actions
+  buildTable('editHeader', 'editBody', true, true); // editable table
+}
+
+  </script>
+</body>
+</html>
